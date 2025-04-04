@@ -5,6 +5,10 @@
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QGraphicsEllipseItem>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QFileDialog>
 
 enum StateMouse{
     Insert_State,
@@ -34,6 +38,7 @@ private:
 
 };
 
+class EdgeItem;
 class NodeItem : public QObject, public QGraphicsEllipseItem {
     Q_OBJECT
 public:
@@ -53,41 +58,97 @@ public:
             scene_Pos = QPointF(sceneBoundingRect.x(), sceneBoundingRect.y());
         });
     }
+    QList<EdgeItem*> connectedEdges;
 
+    void addEdge(EdgeItem* edge) {
+        connectedEdges.append(edge);
+    }
+
+    void removeEdge(EdgeItem* edge) {
+        connectedEdges.removeAll(edge);
+    }
     QPointF scene_Pos;
 
 signals:
     void positionChanged();
 };
 
-
-
-class EdgeItem : public QObject, public QGraphicsLineItem {
+class EdgeItem : public QObject, public QGraphicsItem {
     Q_OBJECT
 public:
-    EdgeItem(NodeItem* startNode, NodeItem* endNode) : start(startNode), end(endNode) {
+    EdgeItem(NodeItem* startNode, NodeItem* endNode)
+        : start(startNode), end(endNode) {
         auto info = staticInformation::instance();
-        int nodeR = info->nodeR / 2;
-        setLine(QLineF(start->scene_Pos + QPointF(nodeR, nodeR), end->scene_Pos + QPointF(nodeR, nodeR)));
-        setPen(QPen(info->edgeColor, 2));
+        pen = QPen(info->edgeColor, 2);
+        arrowSize = 10;
 
-        // Connect the positionChanged signals of both nodes
         connect(start, &NodeItem::positionChanged, this, &EdgeItem::updatePosition);
         connect(end, &NodeItem::positionChanged, this, &EdgeItem::updatePosition);
+
+        start->addEdge(this);
+        end->addEdge(this);
+
+        updatePosition();
+    }
+    ~EdgeItem() {
+        if (start) start->removeEdge(this);
+        if (end) end->removeEdge(this);
+    }
+
+    QRectF boundingRect() const override {
+        qreal extra = (pen.width() + arrowSize) / 2.0;
+        return QRectF(line.p1(), QSizeF(line.p2().x() - line.p1().x(),
+                                        line.p2().y() - line.p1().y()))
+            .normalized()
+            .adjusted(-extra, -extra, extra, extra);
+    }
+
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) override {
+        if (!start || !end)
+            return;
+
+        painter->setPen(pen);
+        painter->drawLine(line);
+
+        painter->setBrush(pen.color());
+        painter->drawPolygon(arrowHead);
     }
 
 public slots:
     void updatePosition() {
-        //qDebug() << "47";
         auto info = staticInformation::instance();
         int nodeR = info->nodeR / 2;
-        setLine(QLineF(start->scene_Pos + QPointF(nodeR, nodeR), end->scene_Pos + QPointF(nodeR, nodeR)));
-    }
 
-private:
+        QPointF p1 = start->scene_Pos + QPointF(nodeR, nodeR);
+        QPointF p2 = end->scene_Pos + QPointF(nodeR, nodeR);
+
+        line = QLineF(p1, p2);  // Full line from start to end
+
+        // Calculate point at 90% of the line (for arrowhead position)
+        QPointF arrowTip = p1 + (p2 - p1) * 0.66;
+
+        double angle = std::atan2(-line.dy(), line.dx());
+
+        QPointF arrowP1 = arrowTip - QPointF(std::cos(angle + M_PI / 6) * arrowSize,
+                                             -std::sin(angle + M_PI / 6) * arrowSize);
+        QPointF arrowP2 = arrowTip - QPointF(std::cos(angle - M_PI / 6) * arrowSize,
+                                             -std::sin(angle - M_PI / 6) * arrowSize);
+
+        arrowHead.clear();
+        arrowHead << arrowTip << arrowP1 << arrowP2;
+
+        update();
+    }
+public:
     NodeItem* start;
     NodeItem* end;
+private:
+    QLineF line;
+    QPolygonF arrowHead;
+    QPen pen;
+    qreal arrowSize;
 };
+
 
 class GraphScene : public QGraphicsScene {
     Q_OBJECT
@@ -110,7 +171,8 @@ class Graph : public QWidget {
     Q_OBJECT
 public:
     Graph(QWidget *parent = nullptr);
-
+    void exportGraph();
+    void importGraph();
 private:
     GraphScene *scene;
     QGraphicsView *view;
