@@ -4,13 +4,13 @@ This project is a simple interactive **graph editor** built with **Qt (C++/QtWid
 
 ## ✨ Features
 
-- 🟢 Add / remove nodes
-- 🧲 Drag and move nodes
-- 🔗 Connect nodes with edges
-- 🎯 Edge arrows for direction
-- 🎨 Customizable node and edge colors
-- 📏 Configurable node radius
-- 💾 Import/Export graph to JSON
+- Add / remove nodes
+- Drag and move nodes
+- Connect nodes with edges
+- Edge arrows for direction
+- Customizable node and edge colors
+- Configurable node radius
+- Import/Export graph to JSON
 
 ## 📋 Todo
 
