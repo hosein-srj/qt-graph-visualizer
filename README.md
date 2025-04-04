@@ -12,6 +12,28 @@ This project is a simple interactive **graph editor** built with **Qt (C++/QtWid
 - 📏 Configurable node radius
 - 💾 Import/Export graph to JSON
 
+## 📋 Todo
+
+- [x] Add/Remove Nodes and Edges
+- [x] Visual edge arrow direction
+- [x] Import/Export JSON support
+- [ ] Add edge weights
+- [ ] Add labels to nodes and edges
+- [ ] Highlight selected edges
+- [ ] Save and load node colors/radius
+- [ ] Implement pathfinding algorithms:
+  - [ ] Dijkstra's Algorithm (shortest path)
+  - [ ] A* Search Algorithm
+- [ ] Implement Minimum Spanning Tree (MST):
+  - [ ] Prim's Algorithm
+  - [ ] Kruskal's Algorithm
+- [ ] Visual animation for algorithm steps
+- [ ] Undo/Redo support
+- [ ] Search node by ID or label
+- [ ] Save as image (SVG, PNG)
+
+
+
 ## 📸 Preview
 
 ![image](https://github.com/user-attachments/assets/8f3e8fd9-e823-4e6a-a73f-cac159d5dac3)
