@@ -1,5 +1,4 @@
-﻿# qt-graph-visualizer
-# Qt Graph Editor
+# Qt Graph Visualizer
 
 This project is a simple interactive **graph editor** built with **Qt (C++/QtWidgets)**. It allows users to add, remove, move, and connect nodes visually, and provides support for import/export of the graph structure using JSON files.
 
