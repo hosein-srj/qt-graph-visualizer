@@ -34,7 +34,8 @@ mkdir build
 cd build
 cmake ..
 make
-./GraphEditor```
+./GraphEditor
+```
 
 ## Contributing
 Feel free to contribute to this project by submitting issues or pull requests. Your feedback and contributions are highly appreciated.
