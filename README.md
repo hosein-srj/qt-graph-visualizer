@@ -34,4 +34,11 @@ mkdir build
 cd build
 cmake ..
 make
-./GraphEditor
+./GraphEditor```
+
+## Contributing
+Feel free to contribute to this project by submitting issues or pull requests. Your feedback and contributions are highly appreciated.
+
+## License
+
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
