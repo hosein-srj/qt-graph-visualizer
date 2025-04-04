@@ -14,7 +14,8 @@ This project is a simple interactive **graph editor** built with **Qt (C++/QtWid
 
 ## 📸 Preview
 
-> *Add a screenshot here if possible!*
+![image](https://github.com/user-attachments/assets/8f3e8fd9-e823-4e6a-a73f-cac159d5dac3)
+
 
 ## 🚀 Getting Started
 
