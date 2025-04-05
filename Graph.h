@@ -59,7 +59,9 @@ public:
             //labelItem->setPos(scene_Pos);
         });
     }
+    //QList<EdgeItem*> connectedEdges;
     QList<EdgeItem*> connectedEdges;
+    QList<NodeItem*> neighbors;
 
     void addEdge(EdgeItem* edge) {
         connectedEdges.append(edge);
@@ -127,6 +129,10 @@ public:
         painter->drawPolygon(arrowHead);
     }
 
+    void setPen(QColor color, int weight){
+        pen = QPen(color, weight);
+    }
+
 public slots:
     void updatePosition() {
         auto info = staticInformation::instance();
@@ -176,8 +182,10 @@ class GraphScene : public QGraphicsScene {
 public:
     GraphScene(StateMouse* state, QObject *parent = nullptr);
     void clearScene();
-
     void setNodesMoveAble(bool isMoveAble);
+    void runDijkstra(NodeItem* start, NodeItem* end);
+    void runA_Start(NodeItem* start, NodeItem* end);
+    void highlightShortestPath(const QMap<NodeItem*, NodeItem*>& previous, NodeItem* end);
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;

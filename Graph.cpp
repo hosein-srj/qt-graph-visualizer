@@ -34,6 +34,136 @@ void GraphScene::setNodesMoveAble(bool isMoveAble)
     }
 }
 
+void GraphScene::runDijkstra(NodeItem* start, NodeItem* end) {
+    QMap<NodeItem*, qreal> distances;
+    QMap<NodeItem*, NodeItem*> previous;
+    QSet<NodeItem*> visited;
+    QList<NodeItem*> nodes;
+
+    for (QGraphicsItem* item : items()) {
+        auto node = dynamic_cast<NodeItem*>(item);
+        if (node) {
+            distances[node] = std::numeric_limits<qreal>::max();
+            nodes.append(node);
+        }
+    }
+
+    distances[start] = 0;
+
+    while (!nodes.isEmpty()) {
+        std::sort(nodes.begin(), nodes.end(), [&](NodeItem* a, NodeItem* b) {
+            return distances[a] < distances[b];
+        });
+
+        NodeItem* current = nodes.takeFirst();
+        if (current == end) break;
+        if (visited.contains(current)) continue;
+
+        visited.insert(current);
+
+        //qDebug() << current->labelItem->toPlainText();
+        for (EdgeItem* edge : current->connectedEdges) {
+            NodeItem* neighbor = (edge->start == current) ? edge->end : nullptr;
+            if(!neighbor) continue;
+            if (visited.contains(neighbor)) continue;
+
+            qreal alt = distances[current] + edge->getWeight();
+            if (alt < distances[neighbor]) {
+                distances[neighbor] = alt;
+                previous[neighbor] = current;
+            }
+        }
+    }
+
+    // Highlight the shortest path
+    NodeItem* current = end;
+    while (previous.contains(current)) {
+        NodeItem* prev = previous[current];
+
+        for (EdgeItem* edge : current->connectedEdges) {
+            if ((edge->start == current && edge->end == prev) ||
+                (edge->start == prev && edge->end == current)) {
+                edge->setPen(Qt::green, 3);
+                break;
+            }
+        }
+
+        current = prev;
+    }
+}
+
+void GraphScene::runA_Start(NodeItem* start, NodeItem* end) {
+    QHash<NodeItem*, qreal> gScore;
+    QHash<NodeItem*, qreal> fScore;
+    QHash<NodeItem*, NodeItem*> cameFrom;
+    QSet<NodeItem*> openSet;
+    QList<NodeItem*> openList;
+
+    // Initialize all nodes
+    for (QGraphicsItem* item : items()) {
+        NodeItem* node = dynamic_cast<NodeItem*>(item);
+        if (node) {
+            gScore[node] = std::numeric_limits<qreal>::max(); // Initialize gScore as infinity
+            fScore[node] = std::numeric_limits<qreal>::max(); // Initialize fScore as infinity
+        }
+    }
+
+    gScore[start] = 0;
+    fScore[start] = 0;  // No heuristic, just set to 0
+    openSet.insert(start);  // Add start node to the open set
+    openList.append(start); // Add start node to the open list
+
+    while (!openList.isEmpty()) {
+        // Sort open list based on fScore
+        std::sort(openList.begin(), openList.end(), [&](NodeItem* a, NodeItem* b) {
+            return fScore[a] < fScore[b]; // Compare by fScore (only gScore here, no heuristic)
+        });
+
+        NodeItem* current = openList.takeFirst();  // Get node with lowest fScore
+        openSet.remove(current); // Remove it from open set
+
+        if (current == end) break; // We found the shortest path
+
+        // Explore neighbors
+        for (EdgeItem* edge : current->connectedEdges) {
+            NodeItem* neighbor = (edge->start == current) ? edge->end : nullptr;
+            if(!neighbor) continue;
+            qreal tentative_gScore = gScore[current] + edge->getWeight();  // Calculate the cost to reach the neighbor
+
+            // Only consider this neighbor if the new path to it is better
+            if (tentative_gScore < gScore[neighbor]) {
+                cameFrom[neighbor] = current;
+                gScore[neighbor] = tentative_gScore;
+                fScore[neighbor] = gScore[neighbor]; // Since there's no heuristic, fScore is just gScore
+
+                // Only add to openList if it's not already in openSet
+                if (!openSet.contains(neighbor)) {
+                    openSet.insert(neighbor);
+                    openList.append(neighbor);  // Add neighbor to open list
+                }
+            }
+        }
+    }
+
+    // Reconstruct and highlight the path
+    NodeItem* current = end;
+    while (cameFrom.contains(current)) {
+        NodeItem* prev = cameFrom[current];
+
+        // Highlight the edge
+        for (EdgeItem* edge : current->connectedEdges) {
+            if ((edge->start == current && edge->end == prev) ||
+                (edge->start == prev && edge->end == current)) {
+                edge->setPen(Qt::darkMagenta, 3); // Highlight the path
+                break;
+            }
+        }
+
+        current = prev;
+    }
+}
+
+
 void GraphScene::mousePressEvent(QGraphicsSceneMouseEvent *event) {
     if (*stateMouse == Insert_State) {
         QGraphicsItem *clickedItem = itemAt(event->scenePos(), QTransform());
@@ -128,6 +258,12 @@ void GraphScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event) {
             //auto info = staticInformation::instance();
             double weight = QInputDialog::getDouble(nullptr, "Edge Weight", "Enter edge weight:");
             EdgeItem* edge = new EdgeItem(startNode, endNode, weight);
+
+            startNode->connectedEdges.append(edge);
+            startNode->neighbors.append(endNode);
+            //endNode->connectedEdges.append(edge);
+            //endNode->neighbors.append(startNode);
+
             addItem(edge);
         }
         // else{
@@ -208,6 +344,60 @@ Graph::Graph(QWidget *parent) : QWidget(parent) {
         scene->clearScene();
     });
 
+    QPushButton* btnDijkstra = new QPushButton("Run Dijkstra");
+    connect(btnDijkstra, &QPushButton::clicked, this, [=]() {
+        QList<QGraphicsItem*> allItems = scene->items();
+        QString n1_label = QInputDialog::getText(nullptr, "Node Label Start", "Enter node label Start:");
+        QString n2_label = QInputDialog::getText(nullptr, "Node Label End", "Enter node label End:");
+        NodeItem* n1 = nullptr;
+        NodeItem* n2 = nullptr;
+        for(QGraphicsItem* item: allItems){
+            NodeItem* item_n = dynamic_cast<NodeItem*>(item);
+            EdgeItem* item_e = dynamic_cast<EdgeItem*>(item);
+            auto info = staticInformation::instance();
+            if(item_e) item_e->setPen(info->edgeColor, 2);
+            if(!item_n) continue;
+            if(item_n->labelItem->toPlainText() == n1_label){
+                n1 = item_n;
+            }
+            if(item_n->labelItem->toPlainText() == n2_label){
+                n2 = item_n;
+            }
+        }
+        if (n1 && n2) {
+            scene->runDijkstra(n1, n2);
+        } else {
+            QMessageBox::information(this, "Dijkstra", "Please select 2 valid nodes.");
+        }
+    });
+
+    QPushButton* btnA_Start = new QPushButton("Run A*");
+    connect(btnA_Start, &QPushButton::clicked, this, [=]() {
+        QList<QGraphicsItem*> allItems = scene->items();
+        QString n1_label = QInputDialog::getText(nullptr, "Node Label Start", "Enter node label Start:");
+        QString n2_label = QInputDialog::getText(nullptr, "Node Label End", "Enter node label End:");
+        NodeItem* n1 = nullptr;
+        NodeItem* n2 = nullptr;
+        for(QGraphicsItem* item: allItems){
+            NodeItem* item_n = dynamic_cast<NodeItem*>(item);
+            EdgeItem* item_e = dynamic_cast<EdgeItem*>(item);
+            auto info = staticInformation::instance();
+            if(item_e) item_e->setPen(info->edgeColor, 2);
+            if(!item_n) continue;
+            if(item_n->labelItem->toPlainText() == n1_label){
+                n1 = item_n;
+            }
+            if(item_n->labelItem->toPlainText() == n2_label){
+                n2 = item_n;
+            }
+        }
+        if (n1 && n2) {
+            scene->runA_Start(n1, n2);
+        } else {
+            QMessageBox::information(this, "Dijkstra", "Please select 2 valid nodes.");
+        }
+    });
+
     stateMouse = new StateMouse();
     *stateMouse = Insert_State;
 
@@ -224,13 +414,16 @@ Graph::Graph(QWidget *parent) : QWidget(parent) {
     layTop->addWidget(btnImport, 1, 4);
     layTop->addWidget(btnExport, 1, 5);
 
+    layTop->addWidget(btnDijkstra, 2, 0);
+    layTop->addWidget(btnA_Start, 2, 1);
+
     scene = new GraphScene(stateMouse, this);
     view = new QGraphicsView(scene, this);
 
     laymain->addLayout(layTop);
     laymain->addWidget(view);
     setLayout(laymain);
-    scene->setSceneRect(0, 0, 800, 600);
+    //scene->setSceneRect(0, 0, 800, 600);
 }
 
 
@@ -338,7 +531,12 @@ void Graph::importGraph() {
         if (startNode && endNode) {
             double weight = obj["weight"].toDouble(1.0); // default weight
             EdgeItem* edge = new EdgeItem(startNode, endNode, weight);
-            //EdgeItem* edge = new EdgeItem(startNode, endNode);
+
+            startNode->connectedEdges.append(edge);
+            startNode->neighbors.append(endNode);
+            endNode->connectedEdges.append(edge);
+            endNode->neighbors.append(startNode);
+
             scene->addItem(edge);
         }
     }
