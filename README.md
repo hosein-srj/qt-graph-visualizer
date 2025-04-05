@@ -36,7 +36,7 @@ This project is a simple interactive **graph editor** built with **Qt (C++/QtWid
 
 ## 📸 Preview
 
-![image](https://github.com/user-attachments/assets/8f3e8fd9-e823-4e6a-a73f-cac159d5dac3)
+![image](https://github.com/user-attachments/assets/ed908cf9-8e4c-4d99-ac56-dacce99c786b)
 
 
 ## 🚀 Getting Started
