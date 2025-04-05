@@ -27,11 +27,13 @@ public:
         return ins;
     }
     int nodeR;
+    double defaultWeight;
     QColor nodeColor;
     QColor edgeColor;
 private:
     staticInformation(){
         nodeR = 30;
+        defaultWeight = 1.0;
         nodeColor = QColor(Qt::red);
         edgeColor = QColor(Qt::blue);
     }
@@ -42,20 +44,19 @@ class EdgeItem;
 class NodeItem : public QObject, public QGraphicsEllipseItem {
     Q_OBJECT
 public:
-    NodeItem(qreal x, qreal y, qreal w, qreal h) : QGraphicsEllipseItem(x, y, w, h) {
+    NodeItem(qreal x, qreal y, qreal w, qreal h, const QString& labelText = "") : QGraphicsEllipseItem(x, y, w, h) {
         auto info = staticInformation::instance();
         setBrush(info->nodeColor);
         scene_Pos = QPointF(this->rect().x(), this->rect().y());
-        //qDebug() << ;
+
+        labelItem = new QGraphicsTextItem(labelText, this);
+        labelItem->setDefaultTextColor(Qt::black);
+        labelItem->setPos(scene_Pos + QPointF(w/2 - 7, h/2 - 12));
 
         connect(this, &NodeItem::positionChanged, this, [=](){
-            //scene_Pos = QPointF(this->rect().x(), this->rect().y());
-            //scene_Pos = scenePos();
-
             QRectF sceneBoundingRect = this->mapRectToScene(this->rect());
-            //qDebug() << scene_Pos << sceneBoundingRect;
-
             scene_Pos = QPointF(sceneBoundingRect.x(), sceneBoundingRect.y());
+            //labelItem->setPos(scene_Pos);
         });
     }
     QList<EdgeItem*> connectedEdges;
@@ -68,7 +69,7 @@ public:
         connectedEdges.removeAll(edge);
     }
     QPointF scene_Pos;
-
+    QGraphicsTextItem* labelItem;
 signals:
     void positionChanged();
 };
@@ -76,14 +77,17 @@ signals:
 class EdgeItem : public QObject, public QGraphicsItem {
     Q_OBJECT
 public:
-    EdgeItem(NodeItem* startNode, NodeItem* endNode)
-        : start(startNode), end(endNode) {
+    EdgeItem(NodeItem* startNode, NodeItem* endNode, double weight = 1.0)
+        : start(startNode), end(endNode), weight(weight) {
         auto info = staticInformation::instance();
         pen = QPen(info->edgeColor, 2);
         arrowSize = 10;
 
         connect(start, &NodeItem::positionChanged, this, &EdgeItem::updatePosition);
         connect(end, &NodeItem::positionChanged, this, &EdgeItem::updatePosition);
+
+        label = new QGraphicsTextItem(QString::number(weight), this);
+        label->setDefaultTextColor(Qt::black);
 
         start->addEdge(this);
         end->addEdge(this);
@@ -101,6 +105,15 @@ public:
                                         line.p2().y() - line.p1().y()))
             .normalized()
             .adjusted(-extra, -extra, extra, extra);
+    }
+
+    double getWeight() const { return weight; }
+
+    void setWeight(double w) {
+        weight = w;
+        if (label) {
+            label->setPlainText(QString::number(weight));
+        }
     }
 
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) override {
@@ -137,6 +150,12 @@ public slots:
         arrowHead.clear();
         arrowHead << arrowTip << arrowP1 << arrowP2;
 
+        // Label at midpoint
+        if (label) {
+            QPointF midpoint = p1 + (p2 - p1) * 0.66 + QPointF(0, 5);
+            label->setPos(midpoint);
+        }
+
         update();
     }
 public:
@@ -147,6 +166,8 @@ private:
     QPolygonF arrowHead;
     QPen pen;
     qreal arrowSize;
+    QGraphicsTextItem* label;
+    double weight;
 };
 
 
@@ -154,6 +175,7 @@ class GraphScene : public QGraphicsScene {
     Q_OBJECT
 public:
     GraphScene(StateMouse* state, QObject *parent = nullptr);
+    void clearScene();
 
     void setNodesMoveAble(bool isMoveAble);
 protected:
@@ -171,6 +193,9 @@ class Graph : public QWidget {
     Q_OBJECT
 public:
     Graph(QWidget *parent = nullptr);
+    void close(){
+        scene->clearScene();
+    }
     void exportGraph();
     void importGraph();
 private:

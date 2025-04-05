@@ -5,6 +5,15 @@ GraphScene::GraphScene(StateMouse *state, QObject *parent) : QGraphicsScene(pare
 
 }
 
+void GraphScene::clearScene()
+{
+    QList<QGraphicsItem*> allItems = items();
+    for (QGraphicsItem* item : allItems) {
+        removeItem(item);
+        delete item;
+    }
+}
+
 void GraphScene::setNodesMoveAble(bool isMoveAble)
 {
     auto itemsAtScene = items();
@@ -31,7 +40,8 @@ void GraphScene::mousePressEvent(QGraphicsSceneMouseEvent *event) {
         if (!clickedItem && event->button() == Qt::LeftButton) {
             auto info = staticInformation::instance();
             int nodeR = info->nodeR / 2;
-            auto node = new NodeItem(event->scenePos().x() - nodeR, event->scenePos().y() - nodeR, nodeR * 2, nodeR * 2);
+            QString label = QInputDialog::getText(nullptr, "Node Label", "Enter node label:");
+            auto node = new NodeItem(event->scenePos().x() - nodeR, event->scenePos().y() - nodeR, nodeR * 2, nodeR * 2, label);
 
             addItem(node);
         }
@@ -90,6 +100,7 @@ void GraphScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event) {
             NodeItem* node = dynamic_cast<NodeItem*>(item);
             if (node) {
                 emit node->positionChanged();
+                update();
             }
         }
     }
@@ -114,8 +125,9 @@ void GraphScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event) {
         }
 
         if (endNode && endNode != startNode) {
-            //qDebug() << "92";
-            EdgeItem* edge = new EdgeItem(startNode, endNode);
+            //auto info = staticInformation::instance();
+            double weight = QInputDialog::getDouble(nullptr, "Edge Weight", "Enter edge weight:");
+            EdgeItem* edge = new EdgeItem(startNode, endNode, weight);
             addItem(edge);
         }
         // else{
@@ -191,6 +203,11 @@ Graph::Graph(QWidget *parent) : QWidget(parent) {
         scene->setNodesMoveAble(true);
     });
 
+    QPushButton* btnClear = new QPushButton("Clear");
+    connect(btnClear, &QPushButton::clicked, this, [=]() {
+        scene->clearScene();
+    });
+
     stateMouse = new StateMouse();
     *stateMouse = Insert_State;
 
@@ -198,12 +215,14 @@ Graph::Graph(QWidget *parent) : QWidget(parent) {
     layTop->addWidget(btnRemove, 0, 1);
     layTop->addWidget(btnDrag, 0, 2);
     layTop->addWidget(btnConnect, 0, 3);
-    layTop->addWidget(btnExport, 0, 4);
+    layTop->addWidget(btnClear, 0, 4);
+
     layTop->addWidget(lblRadius, 1, 0);
     layTop->addWidget(spinRadius, 1, 1);
     layTop->addWidget(btnNodeColor, 1, 2);
     layTop->addWidget(btnEdgeColor, 1, 3);
     layTop->addWidget(btnImport, 1, 4);
+    layTop->addWidget(btnExport, 1, 5);
 
     scene = new GraphScene(stateMouse, this);
     view = new QGraphicsView(scene, this);
@@ -217,60 +236,60 @@ Graph::Graph(QWidget *parent) : QWidget(parent) {
 
 
 void Graph::exportGraph() {
-    QJsonArray nodeArray;
-    QJsonArray edgeArray;
+    QJsonArray nodesArray;
+    QJsonArray edgesArray;
+    auto itemsInScene = scene->items();
 
-    // Serialize all nodes
-    for (QGraphicsItem* item : scene->items()) {
-        if (NodeItem* node = dynamic_cast<NodeItem*>(item)) {
+    // Collect nodes
+    for (QGraphicsItem* item : itemsInScene) {
+        NodeItem* node = dynamic_cast<NodeItem*>(item);
+        if (node) {
             QJsonObject nodeObj;
             nodeObj["x"] = node->scene_Pos.x();
             nodeObj["y"] = node->scene_Pos.y();
-            nodeObj["radius"] = staticInformation::instance()->nodeR;
-            nodeArray.append(nodeObj);
+            nodeObj["color"] = node->brush().color().name();
+            nodeObj["label"] = node->labelItem->toPlainText();
+            nodesArray.append(nodeObj);
         }
     }
 
-    // Serialize all edges
-    for (QGraphicsItem* item : scene->items()) {
-        if (EdgeItem* edge = dynamic_cast<EdgeItem*>(item)) {
+    // Collect edges
+    for (QGraphicsItem* item : itemsInScene) {
+        EdgeItem* edge = dynamic_cast<EdgeItem*>(item);
+        if (edge) {
             QJsonObject edgeObj;
-            QJsonObject startPoint;
-            startPoint["x"] = edge->start->scene_Pos.x();
-            startPoint["y"] = edge->start->scene_Pos.y();
-
-            QJsonObject endPoint;
-            endPoint["x"] = edge->end->scene_Pos.x();
-            endPoint["y"] = edge->end->scene_Pos.y();
-
-            edgeObj["startNode"] = startPoint;
-            edgeObj["endNode"] = endPoint;
-            edgeArray.append(edgeObj);
+            edgeObj["start_x"] = edge->start->scene_Pos.x();
+            edgeObj["start_y"] = edge->start->scene_Pos.y();
+            edgeObj["end_x"] = edge->end->scene_Pos.x();
+            edgeObj["end_y"] = edge->end->scene_Pos.y();
+            edgeObj["weight"] = edge->getWeight();
+            edgesArray.append(edgeObj);
         }
     }
 
-    // Create JSON document
-    QJsonObject graphObj;
-    graphObj["nodes"] = nodeArray;
-    graphObj["edges"] = edgeArray;
+    QJsonObject root;
+    root["nodes"] = nodesArray;
+    root["edges"] = edgesArray;
 
-    // Convert to QByteArray for saving to file
-    QJsonDocument doc(graphObj);
-    QByteArray data = doc.toJson();
+    // Add radius and global colors
+    auto info = staticInformation::instance();
+    root["nodeRadius"] = info->nodeR;
+    root["nodeColor"] = info->nodeColor.name();
+    root["edgeColor"] = info->edgeColor.name();
 
-    // Save to file
-    QString fileName = QFileDialog::getSaveFileName(this, "Save Graph", "", "JSON Files (*.json)");
+    QJsonDocument doc(root);
+    QString fileName = QFileDialog::getSaveFileName(this, "Export Graph", "", "*.json");
     if (!fileName.isEmpty()) {
         QFile file(fileName);
         if (file.open(QIODevice::WriteOnly)) {
-            file.write(data);
+            file.write(doc.toJson());
             file.close();
         }
     }
 }
 
 void Graph::importGraph() {
-    QString fileName = QFileDialog::getOpenFileName(this, "Open Graph", "", "JSON Files (*.json)");
+    QString fileName = QFileDialog::getOpenFileName(this, "Import Graph", "", "*.json");
     if (fileName.isEmpty()) return;
 
     QFile file(fileName);
@@ -278,52 +297,51 @@ void Graph::importGraph() {
 
     QByteArray data = file.readAll();
     QJsonDocument doc = QJsonDocument::fromJson(data);
-    QJsonObject graphObj = doc.object();
+    QJsonObject root = doc.object();
 
-    // Clear current scene
     scene->clear();
 
-    // Load nodes
-    QJsonArray nodeArray = graphObj["nodes"].toArray();
-    for (const QJsonValue& value : nodeArray) {
-        QJsonObject nodeObj = value.toObject();
-        qreal x = nodeObj["x"].toDouble();
-        qreal y = nodeObj["y"].toDouble();
-        int radius = nodeObj["radius"].toInt();
+    QMap<QPair<qreal, qreal>, NodeItem*> positionToNode;
 
-        auto node = new NodeItem(x, y, radius, radius);
+    auto info = staticInformation::instance();
+    info->nodeR = root["nodeRadius"].toInt(30);  // fallback default
+    info->nodeColor = QColor(root["nodeColor"].toString("#ff0000"));
+    info->edgeColor = QColor(root["edgeColor"].toString("#0000ff"));
+
+    // Load nodes
+    QJsonArray nodesArray = root["nodes"].toArray();
+    for (const QJsonValue& val : nodesArray) {
+        QJsonObject obj = val.toObject();
+        qreal x = obj["x"].toDouble();
+        qreal y = obj["y"].toDouble();
+        QString colorStr = obj["color"].toString();
+        QString label = obj["label"].toString();
+
+        int nodeR = info->nodeR / 2;
+        NodeItem* node = new NodeItem(x - nodeR, y - nodeR, nodeR * 2, nodeR * 2, label);
+        node->setBrush(QColor(colorStr));
         scene->addItem(node);
+        positionToNode[{x, y}] = node;
     }
 
     // Load edges
-    QJsonArray edgeArray = graphObj["edges"].toArray();
-    for (const QJsonValue& value : edgeArray) {
-        QJsonObject edgeObj = value.toObject();
-        QJsonObject startPointObj = edgeObj["startNode"].toObject();
-        QJsonObject endPointObj = edgeObj["endNode"].toObject();
+    QJsonArray edgesArray = root["edges"].toArray();
+    for (const QJsonValue& val : edgesArray) {
+        QJsonObject obj = val.toObject();
+        QPointF start(obj["start_x"].toDouble(), obj["start_y"].toDouble());
+        QPointF end(obj["end_x"].toDouble(), obj["end_y"].toDouble());
 
-        QPointF startPos(startPointObj["x"].toDouble(), startPointObj["y"].toDouble());
-        QPointF endPos(endPointObj["x"].toDouble(), endPointObj["y"].toDouble());
-        NodeItem* startNode = nullptr;
-        NodeItem* endNode = nullptr;
 
-        for (QGraphicsItem* item : scene->items()) {
-            if (NodeItem* node = dynamic_cast<NodeItem*>(item)) {
-                if (node->scene_Pos == startPos) {
-                    startNode = node;
-                }
-                if (node->scene_Pos == endPos) {
-                    endNode = node;
-                }
-                //qDebug() << node->scene_Pos << startPos << endPos;
-            }
-        }
+        NodeItem* startNode = positionToNode.value({start.x(), start.y()}, nullptr);
+        NodeItem* endNode = positionToNode.value({end.x(), end.y()}, nullptr);
+
         if (startNode && endNode) {
-            EdgeItem* edge = new EdgeItem(startNode, endNode);
+            double weight = obj["weight"].toDouble(1.0); // default weight
+            EdgeItem* edge = new EdgeItem(startNode, endNode, weight);
+            //EdgeItem* edge = new EdgeItem(startNode, endNode);
             scene->addItem(edge);
         }
     }
 
     file.close();
 }
-
