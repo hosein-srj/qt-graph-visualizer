@@ -2,3 +2,8 @@
 /debug
 /release
 GraphVisualizer.pro.user
+.qmake.stash
+Makefile
+Makefile.Debug
+Makefile.Release
+ui_mainwindow.h
