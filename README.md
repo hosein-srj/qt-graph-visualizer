@@ -17,13 +17,13 @@ This project is a simple interactive **graph editor** built with **Qt (C++/QtWid
 - [x] Add/Remove Nodes and Edges
 - [x] Visual edge arrow direction
 - [x] Import/Export JSON support
-- [ ] Add edge weights
-- [ ] Add labels to nodes and edges
+- [x] Add edge weights
+- [x] Add labels to nodes and edges
 - [ ] Highlight selected edges
-- [ ] Save and load node colors/radius
-- [ ] Implement pathfinding algorithms:
-  - [ ] Dijkstra's Algorithm (shortest path)
-  - [ ] A* Search Algorithm
+- [x] Save and load node colors/radius
+- [x] Implement pathfinding algorithms:
+  - [x] Dijkstra's Algorithm (shortest path)
+  - [x] A* Search Algorithm
 - [ ] Implement Minimum Spanning Tree (MST):
   - [ ] Prim's Algorithm
   - [ ] Kruskal's Algorithm
